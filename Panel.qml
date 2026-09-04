@@ -335,6 +335,31 @@ Panel {
                         color: root.mutedForeground
                         font.family: Style.font.family; font.pixelSize: Style.font.caption
                     }
+
+                    Item { width: parent.width; height: Style.space(2) }
+                    Text {
+                        textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
+                        text: "ABOUT OPENPROJECT"
+                        color: root.accentForeground
+                        font.family: Style.font.family; font.pixelSize: Style.font.caption; font.bold: true
+                    }
+                    Text {
+                        textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
+                        text: "OpenProject is a free, open-source web-based project management & collaboration suite (MIT-licensed, GPLv3 for the core plus an open core). It brings together task and work-package tracking, Gantt charts, agile boards, time & cost tracking, and a full planning API — self-hostable or in the cloud at openproject.org."
+                        color: root.mutedForeground
+                        font.family: Style.font.family; font.pixelSize: Style.font.bodySmall
+                    }
+                    Text {
+                        textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
+                        text: "This widget pulls your assigned open work packages and the active time-tracking session straight from your OpenProject instance into the Quickshell/Omanchy bar, with start/stop timers and comment labels."
+                        color: root.mutedForeground
+                        font.family: Style.font.family; font.pixelSize: Style.font.bodySmall
+                    }
+                    Button {
+                        text: "openproject.org ↗"; bordered: true
+                        horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
+                        onClicked: Qt.openUrlExternally("https://www.openproject.org")
+                    }
                 }
 
                 // Status / error line
@@ -383,7 +408,7 @@ Panel {
                             Button {
                                 text: "Open"; bordered: true
                                 horizontalPadding: Style.space(8); verticalPadding: Style.space(3)
-                                onClicked: root.openWorkPackage(root.ongoing[0].workPackageId)
+                                onClicked: { root.openWorkPackage(root.ongoing[0].workPackageId); root.close() }
                             }
                             Button {
                                 text: root.busy ? "Working…" : "Stop"; bordered: true; enabled: !root.busy
@@ -530,7 +555,7 @@ Panel {
                                         Button {
                                             text: "Open"; bordered: true
                                             horizontalPadding: Style.space(7); verticalPadding: Style.space(3)
-                                            onClicked: root.openTaskInBrowser(modelData)
+                                            onClicked: { root.openTaskInBrowser(modelData); root.close() }
                                         }
                                     }
                                 }
