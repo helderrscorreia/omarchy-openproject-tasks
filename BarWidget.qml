@@ -145,12 +145,23 @@ BarWidget {
             id: row
             anchors.centerIn: parent
             spacing: Style.spaceReal(4)
+            Image {
+                id: logoImage
+                source: Qt.resolvedUrl("openproject-logo.png")
+                sourceSize.width: Math.round(Style.bar.iconFont * 1.6)
+                sourceSize.height: Math.round(Style.bar.iconFont * 1.6)
+                width: sourceSize.width
+                height: sourceSize.height
+                smooth: true
+                visible: root.configured
+            }
             Text {
-                id: emojiLabel
+                id: logoFallback
                 textFormat: Text.PlainText
-                text: "⏱"
+                text: "HP"
                 font.family: Style.font.family; font.pixelSize: Style.bar.iconFont
                 color: !root.configured ? Color.urgent : (root.bar ? root.bar.foreground : Color.foreground)
+                visible: !root.configured
             }
             Text {
                 id: dotLabel
