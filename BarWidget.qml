@@ -148,8 +148,8 @@ BarWidget {
             Image {
                 id: logoImage
                 source: Qt.resolvedUrl("openproject-logo.png")
-                sourceSize.width: Math.round(Style.bar.iconFont * 1.6)
-                sourceSize.height: Math.round(Style.bar.iconFont * 1.6)
+                sourceSize.width: Math.round(Style.bar.iconFont * 1.2)
+                sourceSize.height: Math.round(Style.bar.iconFont * 1.2)
                 width: sourceSize.width
                 height: sourceSize.height
                 smooth: true

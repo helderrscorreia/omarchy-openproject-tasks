@@ -210,12 +210,23 @@ Panel {
                 // Header
                 Item {
                     width: parent.width; height: Style.space(32)
-                    Text {
-                        textFormat: Text.PlainText
+                    Row {
                         anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                        text: "OPENPROJECT TASKS"
-                        color: root.contentForeground
-                        font.family: Style.font.family; font.pixelSize: Style.font.bodySmall; font.bold: true
+                        spacing: Style.space(6)
+                        Image {
+                            source: Qt.resolvedUrl("openproject-logo.png")
+                            sourceSize.width: Style.space(18)
+                            sourceSize.height: Style.space(18)
+                            width: sourceSize.width
+                            height: sourceSize.height
+                            smooth: true
+                        }
+                        Text {
+                            textFormat: Text.PlainText
+                            text: "OPENPROJECT TASKS"
+                            color: root.contentForeground
+                            font.family: Style.font.family; font.pixelSize: Style.font.bodySmall; font.bold: true
+                        }
                     }
                     Button {
                         anchors.right: newTaskButton.left; anchors.rightMargin: Style.space(6)
