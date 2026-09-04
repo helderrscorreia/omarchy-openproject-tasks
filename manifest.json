@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "id": "helderrscorreia.openproject-tasks",
+  "name": "OpenProject Tasks",
+  "version": "1.0.0",
+  "author": "helderrscorreia",
+  "license": "MIT",
+  "description": "Open assigned OpenProject work packages with priorities, time tracking (start/stop timer), and comment labels.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "OpenProject Tasks",
+    "description": "Shows open tasks assigned to you with priorities, a running timer, start/stop controls, and comment labels.",
+    "category": "Productivity",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "openprojectUrl": "",
+      "apiToken": "",
+      "pollIntervalSec": 120,
+      "maxTasks": 50
+    },
+    "schema": [
+      {
+        "key": "openprojectUrl",
+        "type": "string",
+        "label": "OpenProject URL",
+        "defaultValue": "",
+        "description": "Base URL of your instance, e.g. https://projects.example.com (no trailing /api)."
+      },
+      {
+        "key": "apiToken",
+        "type": "string",
+        "label": "API token",
+        "defaultValue": "",
+        "description": "My account > Access tokens > + API Token. Sent as Basic apikey:token."
+      },
+      {
+        "key": "pollIntervalSec",
+        "type": "integer",
+        "label": "Refresh interval (seconds)",
+        "min": 30,
+        "max": 900,
+        "step": 30,
+        "defaultValue": 120,
+        "description": "How often to refresh tasks and timer state."
+      },
+      {
+        "key": "maxTasks",
+        "type": "integer",
+        "label": "Max tasks",
+        "min": 10,
+        "max": 200,
+        "step": 10,
+        "defaultValue": 50,
+        "description": "Max open assigned work packages to fetch."
+      }
+    ]
+  }
+}
