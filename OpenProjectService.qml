@@ -6,7 +6,6 @@ Item {
     id: root
 
     property string baseUrl: ""
-    property string apiToken: ""
     property int maxTasks: 50
     property bool busy: statusProcess.running || actionProcess.running
     property string lastError: ""
@@ -15,6 +14,10 @@ Item {
     readonly property string helperPath: root.pluginDir() + "/openproject.py"
     readonly property string cachePath: Quickshell.env("HOME")
         + "/.local/state/omarchy/openproject-tasks/cache.json"
+    // The API token lives in a private (0600) file, never in process argv.
+    readonly property string tokenFilePath: Quickshell.env("HOME")
+        + "/.local/state/omarchy/openproject-tasks/token"
+    readonly property bool hasToken: tokenStatusFile.loaded && String(tokenStatusFile.text()).trim() !== ""
 
     function pluginDir() {
         return decodeURIComponent(String(Qt.resolvedUrl("openproject.py")).replace(/^file:\/\//, "").replace(/\/openproject\.py$/, ""))
@@ -23,14 +26,25 @@ Item {
     signal cacheChanged()
     signal actionDone(bool ok, string message)
 
+    // Reflects whether the private token file exists and is non-empty. Deleted
+    // or emptied files flip hasToken on the fly so the widget can prompt setup.
+    FileView {
+        id: tokenStatusFile
+        path: root.tokenFilePath
+        watchChanges: true
+        printErrors: false
+    }
+
     function cleanArgs() {
-        return ["--url", root.baseUrl, "--token", root.apiToken,
+        // The token is NOT passed as an argument; the helper reads it from the
+        // private token file (--token-file). This keeps it out of argv.
+        return ["--url", root.baseUrl, "--token-file", root.tokenFilePath,
                 "--max", String(root.maxTasks)];
     }
 
     function refresh() {
         if (root.busy) return
-        if (!root.baseUrl || !root.apiToken) return
+        if (!root.baseUrl || !root.hasToken) return
         root.lastError = ""
         root.lastStatus = "Refreshing..."
         statusProcess.command = ["/usr/bin/python3", root.helperPath, "--out", root.cachePath]

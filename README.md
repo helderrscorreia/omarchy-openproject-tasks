@@ -25,7 +25,7 @@ Click the widget in the bar → gear icon to open Setup. Enter your instance URL
 - **URL**: base URL of your instance, e.g. `https://projects.example.com` (no trailing `/api`).
 - **API token**: My account → Access tokens → `+ API Token`. The `+ API token` button in Setup opens `<url>/my/access_tokens`. The token is sent as HTTP Basic auth `apikey:<token>`.
 
-The URL and token are stored in your user's Omarchy shell settings, never in the plugin or a committed file.
+The instance URL is stored in your user's Omarchy shell settings. The API token is stored in a **private file** (`~/.local/state/omarchy/openproject-tasks/token`, mode `0600`) — it is never placed in process command lines, never committed, and never sent anywhere except as Basic auth to the configured instance.
 
 ## Usage
 
@@ -52,7 +52,7 @@ omarchy plugin remove helderrscorreia.openproject-tasks
 
 ## Security
 
-This plugin runs unsandboxed inside the long-running Omarchy shell process. It makes authenticated HTTPS requests only to the OpenProject URL you configure, spawns `/usr/bin/python3` (stdlib only, no network access beyond the configured instance), and stores your API token in your user's Omarchy shell settings. Review the source before installing.
+This plugin runs unsandboxed inside the long-running Omarchy shell process. It makes authenticated HTTPS requests only to the OpenProject URL you configure (plain `http://` is refused so the token is never sent in clear), spawns `/usr/bin/python3` (stdlib only, no network access beyond the configured instance), and stores your API token in a private `0600` file (`~/.local/state/omarchy/openproject-tasks/token`), reading it over stdin/from the file so the secret never appears in a process command line. Review the source before installing.
 
 ## License
 

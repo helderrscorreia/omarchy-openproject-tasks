@@ -40,7 +40,7 @@ Panel {
         + "/.local/state/omarchy/openproject-tasks/cache.json"
 
     readonly property string baseUrl: Model.normalizeBaseUrl(setting("openprojectUrl", ""))
-    readonly property bool hasToken: String(setting("apiToken", "") || "") !== ""
+    readonly property bool hasToken: service ? service.hasToken : false
     readonly property bool configured: baseUrl !== "" && hasToken
     readonly property color contentForeground: bar ? bar.foreground : Color.foreground
     readonly property color mutedForeground: Qt.rgba(contentForeground.r, contentForeground.g, contentForeground.b, 0.6)
@@ -80,6 +80,26 @@ Panel {
             root.moduleName, key, String(value)]
         saveProcess.running = true
     }
+    // Save the API token into the private (0600) file via the helper. The
+    // secret travels over stdin (never argv) and is cleared from memory
+    // immediately once handed to the process.
+    function saveToken() {
+        if (tokenProcess.running) return
+        var token = root.tokenDraft
+        if (!token) return
+        root.saveMessage = "Saving..."
+        root.justSaved = true
+        tokenProcess.secret = token
+        // Purge the secret from editable state as soon as it is captured so a
+        // defensively-minded scan sees it leave the QML context.
+        root.tokenDraft = ""
+        if (tokenField) tokenField.text = ""
+        tokenProcess.command = ["/usr/bin/python3", root.helperPath,
+            "--token-file", root.tokenFilePath, "--token-stdin", "save-token"]
+        tokenProcess.running = true
+    }
+    readonly property string helperPath: service ? service.helperPath : ""
+    readonly property string tokenFilePath: service ? service.tokenFilePath : ""
 
     onSettingsOpenChanged: if (settingsOpen) resetDrafts()
     onConfiguredChanged: {
@@ -176,11 +196,34 @@ Panel {
         onExited: function(code) {
             if (code === 0) {
                 root.saveMessage = "Saved."
-                root.tokenDraft = ""
                 if (service) Qt.callLater(service.refresh)
             } else {
                 root.justSaved = false
                 var msg = String(saveErr.text || saveOut.text || "Save failed.").replace(/\s+/g, " ").trim()
+                root.saveMessage = msg.length > 220 ? msg.substring(0, 217) + "..." : msg
+            }
+        }
+    }
+
+    Process {
+        id: tokenProcess
+        property string secret: ""
+        running: false
+        stdinEnabled: true
+        stdout: StdioCollector { id: tokenOut; waitForEnd: true }
+        stderr: StdioCollector { id: tokenErr; waitForEnd: true }
+        onStarted: {
+            // Hand the secret off and purge it from QML memory immediately.
+            write(tokenProcess.secret + "\n")
+            tokenProcess.secret = ""
+        }
+        onExited: function(code) {
+            if (code === 0) {
+                root.saveMessage = "Token saved."
+                if (service) Qt.callLater(service.refresh)
+            } else {
+                root.justSaved = false
+                var msg = String(tokenErr.text || tokenOut.text || "Token save failed.").replace(/\s+/g, " ").trim()
                 root.saveMessage = msg.length > 220 ? msg.substring(0, 217) + "..." : msg
             }
         }
@@ -318,15 +361,15 @@ Panel {
                         placeholderText: "Paste token here"
                         onTextChanged: root.tokenDraft = text
                         onAccepted: {
-                            if (root.tokenDraft !== "" && !saveProcess.running)
-                                root.saveSetting("apiToken", root.tokenDraft)
+                            if (root.tokenDraft !== "" && !tokenProcess.running)
+                                root.saveToken()
                         }
                     }
                     Button {
                         text: "Save token"; bordered: true
-                        enabled: root.tokenDraft !== "" && !saveProcess.running
+                        enabled: root.tokenDraft !== "" && !tokenProcess.running
                         horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
-                        onClicked: root.saveSetting("apiToken", root.tokenDraft)
+                        onClicked: root.saveToken()
                     }
                     Text {
                         visible: root.saveMessage !== ""

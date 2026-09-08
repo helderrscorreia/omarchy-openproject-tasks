@@ -10,10 +10,9 @@ BarWidget {
     moduleName: "helderrscorreia.openproject-tasks"
 
     readonly property string baseUrl: Model.normalizeBaseUrl(setting("openprojectUrl", ""))
-    readonly property string apiToken: String(setting("apiToken", "") || "")
     readonly property int pollIntervalSec: Math.max(30, Number(setting("pollIntervalSec", 120)) || 120)
     readonly property int maxTasks: Number(setting("maxTasks", 50)) || 50
-    readonly property bool configured: baseUrl !== "" && apiToken !== ""
+    readonly property bool configured: baseUrl !== "" && service !== null && service.hasToken
 
     property var tasks: []
     property var ongoing: []
@@ -65,7 +64,6 @@ BarWidget {
     OpenProjectService {
         id: service
         baseUrl: root.baseUrl
-        apiToken: root.apiToken
         maxTasks: root.maxTasks
         Component.onCompleted: Qt.callLater(refresh)
         onCacheChanged: cacheFile.reload()
