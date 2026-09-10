@@ -20,13 +20,12 @@ omarchy plugin add https://github.com/helderrscorreia/omarchy-openproject-tasks.
 
 ## Configure
 
-Click the widget in the bar → gear icon to open Setup. Enter your instance URL, an API token, and optionally a custom bar label.
+Click the widget in the bar → gear icon to open Setup. Enter your instance URL and an API token.
 
 - **URL**: base URL of your instance, e.g. `https://projects.example.com` (no trailing `/api`).
 - **API token**: My account → Access tokens → `+ API Token`. The `+ API token` button in Setup opens `<url>/my/access_tokens`. The token is sent as HTTP Basic auth `apikey:<token>`.
-- **Bar label** (optional): text shown in the bar next to the icon and in the panel header. Defaults to `OpenProject Tasks`.
 
-The instance URL and bar label are stored in your user's Omarchy shell settings. The API token is stored in a **private file** (`~/.local/state/omarchy/openproject-tasks/token`, mode `0600`) — it is never placed in process command lines, never committed, and never sent anywhere except as Basic auth to the configured instance.
+The instance URL is stored in your user's Omarchy shell settings. The API token is stored in a **private file** (`~/.local/state/omarchy/openproject-tasks/token`, mode `0600`) — it is never placed in process command lines, never committed, and never sent anywhere except as Basic auth to the configured instance.
 
 ## Usage
 
