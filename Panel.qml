@@ -42,6 +42,7 @@ Panel {
     readonly property string baseUrl: Model.normalizeBaseUrl(setting("openprojectUrl", ""))
     readonly property bool hasToken: service ? service.hasToken : false
     readonly property bool configured: baseUrl !== "" && hasToken
+    readonly property string displayLabel: String(setting("openprojectLabel", "") || "OpenProject Tasks")
     readonly property color contentForeground: bar ? bar.foreground : Color.foreground
     readonly property color mutedForeground: Qt.rgba(contentForeground.r, contentForeground.g, contentForeground.b, 0.6)
     readonly property color accentForeground: Color.accent
@@ -50,6 +51,7 @@ Panel {
     readonly property string effectiveError: root.loadError !== "" ? root.loadError : root.serviceError
 
     property string urlDraft: ""
+    property string labelDraft: ""
     property string tokenDraft: ""
     property string saveMessage: ""
     property bool justSaved: false
@@ -66,10 +68,13 @@ Panel {
 
     function resetDrafts() {
         var savedUrl = String(setting("openprojectUrl", "") || "")
+        var savedLabel = String(setting("openprojectLabel", "") || "OpenProject Tasks")
         root.urlDraft = savedUrl
+        root.labelDraft = savedLabel
         root.tokenDraft = ""
         root.saveMessage = ""
         if (urlField && urlField.text !== savedUrl) urlField.text = savedUrl
+        if (labelField && labelField.text !== savedLabel) labelField.text = savedLabel
         if (tokenField && tokenField.text !== "") tokenField.text = ""
     }
     function saveSetting(key, value) {
@@ -266,7 +271,7 @@ Panel {
                         }
                         Text {
                             textFormat: Text.PlainText
-                            text: "OPENPROJECT TASKS"
+                            text: root.displayLabel.toUpperCase()
                             color: root.contentForeground
                             font.family: Style.font.family; font.pixelSize: Style.font.bodySmall; font.bold: true
                         }
@@ -292,7 +297,7 @@ Panel {
                     Button {
                         id: settingsButton
                         anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                        iconText: "󰒓"; tooltipText: "Setup (URL + token)"
+                        iconText: "󰒓"; tooltipText: "Setup (URL, token, label)"
                         bordered: true; selected: root.settingsOpen
                         horizontalPadding: Style.space(7); verticalPadding: Style.space(4)
                         onClicked: root.settingsOpen = !root.settingsOpen
@@ -370,6 +375,28 @@ Panel {
                         enabled: root.tokenDraft !== "" && !tokenProcess.running
                         horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
                         onClicked: root.saveToken()
+                    }
+                    Text {
+                        textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
+                        text: "3. Bar label (optional)"
+                        color: root.mutedForeground
+                        font.family: Style.font.family; font.pixelSize: Style.font.bodySmall
+                    }
+                    TextField {
+                        id: labelField
+                        width: parent.width
+                        placeholderText: "OpenProject Tasks"
+                        onTextChanged: root.labelDraft = text
+                        onAccepted: {
+                            if (!saveProcess.running)
+                                root.saveSetting("openprojectLabel", root.labelDraft.trim() !== "" ? root.labelDraft.trim() : "OpenProject Tasks")
+                        }
+                    }
+                    Button {
+                        text: "Save label"; bordered: true
+                        enabled: root.labelDraft !== "" && !saveProcess.running
+                        horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
+                        onClicked: root.saveSetting("openprojectLabel", root.labelDraft.trim() !== "" ? root.labelDraft.trim() : "OpenProject Tasks")
                     }
                     Text {
                         visible: root.saveMessage !== ""

@@ -13,6 +13,7 @@ BarWidget {
     readonly property int pollIntervalSec: Math.max(30, Number(setting("pollIntervalSec", 120)) || 120)
     readonly property int maxTasks: Number(setting("maxTasks", 50)) || 50
     readonly property bool configured: baseUrl !== "" && service !== null && service.hasToken
+    readonly property string labelText: String(setting("openprojectLabel", "") || "OpenProject Tasks")
 
     property var tasks: []
     property var ongoing: []
@@ -175,6 +176,15 @@ BarWidget {
                 text: root.configured ? String(root.tasks.length) : "!"
                 font.family: Style.font.family; font.pixelSize: Style.bar.iconFont; font.bold: true
                 color: root.configured ? root.countColor : Color.urgent
+            }
+            Text {
+                id: labelDisplay
+                visible: root.configured
+                textFormat: Text.PlainText
+                text: root.labelText
+                font.family: Style.font.family; font.pixelSize: Math.round(Style.bar.iconFont * 0.75)
+                color: root.bar ? root.bar.foreground : Color.foreground
+                opacity: 0.65
             }
         }
     }

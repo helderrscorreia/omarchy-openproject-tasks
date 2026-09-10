@@ -20,7 +20,7 @@
     "defaultSection": "right",
     "defaults": {
       "openprojectUrl": "",
-      "apiToken": "",
+      "openprojectLabel": "OpenProject Tasks",
       "pollIntervalSec": 120,
       "maxTasks": 50
     },
@@ -33,11 +33,11 @@
         "description": "Base URL of your instance, e.g. https://projects.example.com (no trailing /api)."
       },
       {
-        "key": "apiToken",
+        "key": "openprojectLabel",
         "type": "string",
-        "label": "API token",
-        "defaultValue": "",
-        "description": "My account > Access tokens > + API Token. Sent as Basic apikey:token."
+        "label": "Bar label",
+        "defaultValue": "OpenProject Tasks",
+        "description": "Text shown in the bar next to the icon and in the panel header. API token is stored in a private 0600 file, not as a widget setting."
       },
       {
         "key": "pollIntervalSec",
