@@ -18,10 +18,17 @@ Panel {
 
     property var tasks: []
     property var ongoing: []
+    property var statuses: []
+    property var priorities: []
     property string loadError: ""
     property bool settingsOpen: false
     property string actionMessage: ""
     property string searchQuery: ""
+    property string editingTaskId: ""
+
+    // Reference lists from the cache -> { value, label } for the pickers.
+    property var statusOptions: []
+    property var priorityOptions: []
 
     // Case-insensitive filter over the fields most useful for finding a task.
     readonly property var visibleTasks: {
@@ -124,6 +131,8 @@ Panel {
         // drop it to keep the panel open after a widget click.
         if (Date.now() - root.openedAt < 300) return
         root.settingsOpen = false
+        root.editingTaskId = ""
+        root.commentDraftTaskId = ""
         root.controller.hide()
     }
     function toggle() {
@@ -158,6 +167,19 @@ Panel {
         }
         root.openWorkPackage(task.id)
     }
+    function applyTaskEdit(task, statusId, priorityId) {
+        if (!task || !service) return
+        root.actionMessage = ""
+        root.editingTaskId = ""
+        service.updateTask(task.id, statusId, priorityId)
+    }
+    function editingTask() {
+        if (root.editingTaskId === "") return null
+        for (var i = 0; i < root.tasks.length; i++) {
+            if (String(root.tasks[i].id) === root.editingTaskId) return root.tasks[i]
+        }
+        return null
+    }
 
     FileView {
         id: cacheFile
@@ -170,6 +192,15 @@ Panel {
                 var data = JSON.parse(text())
                 root.tasks = Model.sortedTasks(data.tasks instanceof Array ? data.tasks : [])
                 root.ongoing = data.ongoing instanceof Array ? data.ongoing : []
+                root.statuses = data.statuses instanceof Array ? data.statuses : []
+                root.priorities = data.priorities instanceof Array ? data.priorities : []
+                root.statusOptions = root.statuses.slice().sort(function(a, b) {
+                    var na = String(a.name || "").toLowerCase(), nb = String(b.name || "").toLowerCase()
+                    return na < nb ? -1 : (na > nb ? 1 : 0)
+                }).map(function(s) { return { value: String(s.id), label: String(s.name || "?") } })
+                root.priorityOptions = root.priorities.map(function(p) {
+                    return { value: String(p.id), label: String(p.name || "?") }
+                })
                 root.loadError = data.error ? String(data.error) : ""
             } catch (e) { root.loadError = "Cache unreadable. Refresh to retry." }
         }
@@ -482,9 +513,69 @@ Panel {
                     }
                 }
 
+                // Edit task view (status/priority pickers)
+                Column {
+                    visible: !root.settingsOpen && root.configured && root.editingTaskId !== ""
+                    width: parent.width; spacing: Style.space(8)
+                    Row {
+                        width: parent.width
+                        Text {
+                            textFormat: Text.PlainText; elide: Text.ElideRight; width: parent.width - cancelEditBtn.implicitWidth - Style.space(6)
+                            text: {
+                                var t = root.editingTask()
+                                return t ? ("Edit  #" + t.id + "  " + t.subject) : "Edit task"
+                            }
+                            color: root.accentForeground
+                            font.family: Style.font.family; font.pixelSize: Style.font.caption; font.bold: true
+                        }
+                        Button {
+                            id: cancelEditBtn
+                            text: "✕"; bordered: true; enabled: !root.busy
+                            horizontalPadding: Style.space(7); verticalPadding: Style.space(3)
+                            onClicked: { root.actionMessage = ""; root.editingTaskId = "" }
+                        }
+                    }
+                    Dropdown {
+                        id: editStatusDrop
+                        width: parent.width
+                        label: "Status"
+                        options: root.statusOptions
+                        value: root.editingTask() ? String(root.editingTask().statusId || "") : ""
+                        fontFamily: Style.font.family
+                    }
+                    Dropdown {
+                        id: editPriorityDrop
+                        width: parent.width
+                        label: "Priority"
+                        options: root.priorityOptions
+                        value: root.editingTask() ? String(root.editingTask().priorityId || "") : ""
+                        fontFamily: Style.font.family
+                    }
+                    Row {
+                        spacing: Style.space(6)
+                        Button {
+                            text: "Apply"; bordered: true; enabled: !root.busy
+                            horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
+                            onClicked: root.applyTaskEdit(root.editingTask(), editStatusDrop.value, editPriorityDrop.value)
+                        }
+                        Button {
+                            text: "Cancel"; bordered: true
+                            horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
+                            onClicked: { root.actionMessage = ""; root.editingTaskId = "" }
+                        }
+                    }
+                    Text {
+                        visible: root.statusOptions.length === 0 || root.priorityOptions.length === 0
+                        textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
+                        text: "Status/priority lists unavailable — press Refresh and try again."
+                        color: root.mutedForeground
+                        font.family: Style.font.family; font.pixelSize: Style.font.caption
+                    }
+                }
+
                 // Task list
                 Flickable {
-                    visible: !root.settingsOpen
+                    visible: !root.settingsOpen && root.editingTaskId === ""
                     width: parent.width; height: Math.max(0, parent.height - y)
                     contentWidth: width; contentHeight: taskCol.implicitHeight
                     clip: true; boundsBehavior: Flickable.StopAtBounds
@@ -593,6 +684,16 @@ Panel {
                                                     root.commentDraftTaskId = String(modelData.id)
                                                     root.commentDraft = ""
                                                 }
+                                            }
+                                        }
+                                        Button {
+                                            text: "Edit"; bordered: true; enabled: !root.busy
+                                            selected: root.editingTaskId === String(modelData.id)
+                                            tooltipText: "Change status / priority"
+                                            horizontalPadding: Style.space(7); verticalPadding: Style.space(3)
+                                            onClicked: {
+                                                root.actionMessage = ""
+                                                root.editingTaskId = root.editingTaskId === String(modelData.id) ? "" : String(modelData.id)
                                             }
                                         }
                                         Button {

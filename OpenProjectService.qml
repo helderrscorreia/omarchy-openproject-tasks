@@ -75,6 +75,20 @@ Item {
         actionProcess.running = true
     }
 
+    function updateTask(workPackageId, statusId, priorityId) {
+        if (root.busy) return
+        root.lastError = ""
+        root.lastStatus = "Updating task..."
+        var cmd = ["/usr/bin/python3", root.helperPath].concat(root.cleanArgs())
+            .concat(["update", String(workPackageId)])
+        if (statusId !== undefined && statusId !== null && String(statusId).trim() !== "")
+            cmd.push("--status-id", String(statusId).trim())
+        if (priorityId !== undefined && priorityId !== null && String(priorityId).trim() !== "")
+            cmd.push("--priority-id", String(priorityId).trim())
+        actionProcess.command = cmd
+        actionProcess.running = true
+    }
+
     function parseJson(raw) {
         try {
             var v = JSON.parse(String(raw || ""))
@@ -112,7 +126,8 @@ Item {
             var ok = code === 0 && parsed && parsed.ok === true
             var msg
             if (ok) {
-                if (parsed.alreadyRunning === true) msg = "Timer already running."
+                if (parsed.updated === true) msg = "Task updated."
+                else if (parsed.alreadyRunning === true) msg = "Timer already running."
                 else if (parsed.stopped !== undefined) msg = parsed.stopped > 0 ? "Timer stopped." : "No timer running."
                 else if (parsed.stoppedOthers > 0) msg = "Timer started (previous stopped)."
                 else msg = "Timer started."

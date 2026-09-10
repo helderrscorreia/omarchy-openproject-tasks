@@ -8,6 +8,8 @@ Commands:
   status                          Fetch open tasks + ongoing timers -> cache.json
   start <workPackageId> [--comment TEXT]   Stop other timers, start new one
   stop [timeEntryId]              Stop given entry or all ongoing timers
+  update <workPackageId> [--status ID] [--priority ID]
+                                  Change a task's status and/or priority
   save-token                      Read an API token from stdin and store it in
                                   a private (0600) file; never prints the token
   token-status                    Print {"present": true/false} whether a token
@@ -230,7 +232,9 @@ def fetch_tasks(base, token, max_tasks, timeout):
             "id": el.get("id"),
             "subject": el.get("subject") or "(no subject)",
             "priority": ((links.get("priority") or {}).get("title")) or "",
+            "priorityId": link_id(links.get("priority") or {}),
             "status": ((links.get("status") or {}).get("title")) or "",
+            "statusId": link_id(links.get("status") or {}),
             "type": ((links.get("type") or {}).get("title")) or "",
             "project": ((links.get("project") or {}).get("title")) or "",
             "updatedAt": el.get("updatedAt") or "",
@@ -279,6 +283,27 @@ def default_activity_href(base, token, timeout):
     return None
 
 
+def fetch_reference_list(base, token, resource, timeout):
+    """Fetch the id+name list for a named reference resource (statuses/priorities)."""
+    try:
+        _, payload = api_request(base, token, "GET", "/api/v3/{}".format(resource), timeout=timeout)
+        items = []
+        for el in (payload.get("_embedded") or {}).get("elements") or []:
+            if el.get("id") is not None and (el.get("name") or "").strip():
+                items.append({"id": el.get("id"), "name": el.get("name").strip()})
+        return items
+    except Exception:
+        return []
+
+
+def fetch_statuses(base, token, timeout):
+    return fetch_reference_list(base, token, "statuses", timeout)
+
+
+def fetch_priorities(base, token, timeout):
+    return fetch_reference_list(base, token, "priorities", timeout)
+
+
 def cmd_status(args):
     base = normalize_base(args.url)
     if not base:
@@ -296,6 +321,8 @@ def cmd_status(args):
         "userName": user_name,
         "tasks": tasks,
         "ongoing": ongoing,
+        "statuses": fetch_statuses(base, token, args.timeout),
+        "priorities": fetch_priorities(base, token, args.timeout),
         "error": "",
     }
     if args.out:
@@ -398,6 +425,31 @@ def cmd_stop(args):
     print(json.dumps({"ok": True, "stopped": len(targets)}))
 
 
+def cmd_update(args):
+    base = normalize_base(args.url)
+    token = resolve_token(args)
+    if not base or not token:
+        fail("Set openprojectUrl (https) and an API token first.")
+    status_id = (args.status_id or "").strip()
+    priority_id = (args.priority_id or "").strip()
+    if not status_id and not priority_id:
+        fail("Nothing to update: pass --status and/or --priority.")
+    links = {}
+    if status_id:
+        links["status"] = {"href": "/api/v3/statuses/{}".format(status_id)}
+    if priority_id:
+        links["priority"] = {"href": "/api/v3/priorities/{}".format(priority_id)}
+    _, current = api_request(base, token, "GET", "/api/v3/work_packages/{}".format(args.work_package_id),
+                             timeout=args.timeout)
+    body = {"_links": links}
+    lock_version = current.get("lockVersion")
+    if lock_version is not None:
+        body["lockVersion"] = lock_version
+    api_request(base, token, "PATCH", "/api/v3/work_packages/{}".format(args.work_package_id),
+                body=body, timeout=args.timeout)
+    print(json.dumps({"ok": True, "updated": True}))
+
+
 def cmd_save_token(args):
     token = resolve_token(args)  # --token-stdin reads from stdin
     if not token:
@@ -434,12 +486,18 @@ def main():
     s.add_argument("--comment", default="", help="Comment label for the time entry")
     t = sub.add_parser("stop")
     t.add_argument("time_entry_id", nargs="?")
+    u = sub.add_parser("update")
+    u.add_argument("work_package_id")
+    u.add_argument("--status-id", default="", dest="status_id")
+    u.add_argument("--priority-id", default="", dest="priority_id")
     args = p.parse_args()
     try:
         if args.cmd == "start":
             cmd_start(args)
         elif args.cmd == "stop":
             cmd_stop(args)
+        elif args.cmd == "update":
+            cmd_update(args)
         elif args.cmd == "save-token":
             cmd_save_token(args)
         elif args.cmd == "token-status":
