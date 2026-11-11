@@ -159,6 +159,10 @@ Panel {
         }
         Qt.openUrlExternally(root.baseUrl + "/work_packages/new" + projectId)
     }
+    function openMyPage() {
+        if (!root.baseUrl) return
+        Qt.openUrlExternally(root.baseUrl + "/my/page")
+    }
     function openTaskInBrowser(task) {
         if (!task) return
         if (task.href) {
@@ -303,12 +307,22 @@ Panel {
                         }
                     }
                     Button {
-                        anchors.right: newTaskButton.left; anchors.rightMargin: Style.space(6)
+                        anchors.right: myPageButton.left; anchors.rightMargin: Style.space(6)
                         anchors.verticalCenter: parent.verticalCenter
                         text: "Refresh"; bordered: true
                         enabled: root.configured && !root.busy
                         horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
                         onClicked: { root.actionMessage = ""; service.refresh(); cacheFile.reload() }
+                    }
+                    Button {
+                        id: myPageButton
+                        anchors.right: newTaskButton.left; anchors.rightMargin: Style.space(6)
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "My page"; bordered: true
+                        enabled: root.configured
+                        tooltipText: "Open your OpenProject My page"
+                        horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
+                        onClicked: root.openMyPage()
                     }
                     Button {
                         id: newTaskButton

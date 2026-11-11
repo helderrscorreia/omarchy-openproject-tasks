@@ -10,6 +10,7 @@ Bar widget that shows your **open assigned OpenProject work packages**, their **
 - Start / Switch / Stop the timer per task, with a **comment label** kept on the time entry.
 - Search box to filter tasks (subject, id, project, status, type, priority).
 - `+ New task` opens OpenProject's create-work-package page in your browser.
+- `My page` opens your OpenProject My page (`<url>/my/page`) in your browser.
 - Only sends authenticated HTTPS requests to the OpenProject instance you configure.
 
 ## Install
@@ -33,6 +34,7 @@ The instance URL is stored in your user's Omarchy shell settings. The API token 
 - **Start**: select a task and press Start (other running timers are auto-stopped). Add a comment; the comment is stored on the time entry.
 - **Stop**: press Stop on the active task, or it stops all ongoing timers.
 - **New task**: header `+ New task` opens the create-work-package page in the browser.
+- **My page**: header `My page` opens your OpenProject My page (`<url>/my/page`) in the browser.
 
 ## Remove
 
