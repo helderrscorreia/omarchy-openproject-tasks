@@ -317,7 +317,7 @@ Panel {
         stderr: StdioCollector { id: saveErr; waitForEnd: true }
         onExited: function(code) {
             if (code === 0) {
-                Qt.callLater(root.verifyConnection)
+                verifyDelay.restart()
             } else {
                 var msg = String(saveErr.text || saveOut.text || "Save failed.").replace(/\s+/g, " ").trim()
                 root.saveMessage = msg.length > 220 ? msg.substring(0, 217) + "..." : msg
@@ -339,7 +339,7 @@ Panel {
         }
         onExited: function(code) {
             if (code === 0) {
-                Qt.callLater(root.verifyConnection)
+                verifyDelay.restart()
             } else {
                 var msg = String(tokenErr.text || tokenOut.text || "Token save failed.").replace(/\s+/g, " ").trim()
                 root.saveMessage = msg.length > 220 ? msg.substring(0, 217) + "..." : msg
@@ -437,100 +437,100 @@ Panel {
                     contentWidth: width; contentHeight: setupCol.implicitHeight
                     clip: true; boundsBehavior: Flickable.StopAtBounds
                     Column {
-                    id: setupCol
-                    width: setupScroll.width; spacing: Style.space(8)
-                    Text {
-                        textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
-                        text: "SETUP"
-                        color: root.accentForeground
-                        font.family: Style.font.family; font.pixelSize: Style.font.caption; font.bold: true
-                    }
-                    Text {
-                        textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
-                        text: "1. OpenProject instance URL"
-                        color: root.mutedForeground
-                        font.family: Style.font.family; font.pixelSize: Style.font.bodySmall
-                    }
-                    TextField {
-                        id: urlField
-                        width: parent.width
-                        placeholderText: "https://projects.example.com"
-                        onTextChanged: root.urlDraft = text
-                        onAccepted: {
-                            if (root.urlDraft.trim() !== "" && !saveProcess.running)
-                                root.saveSetting("openprojectUrl", root.urlDraft.trim())
-                        }
-                    }
-                    Row {
-                        spacing: Style.space(6)
-                        Button {
-                            text: "Save URL"; bordered: true
-                            enabled: root.urlDraft.trim() !== "" && !saveProcess.running
-                            horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
-                            onClicked: root.saveSetting("openprojectUrl", root.urlDraft.trim())
-                        }
-                        Button {
-                            text: "Generate API token ↗"; bordered: true
-                            enabled: root.draftTokenUrl !== ""
-                            tooltipText: root.draftTokenUrl
-                            horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
-                            onClicked: Qt.openUrlExternally(root.draftTokenUrl)
-                        }
-                    }
-                    Text {
-                        visible: root.draftTokenUrl !== ""
-                        textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
-                        text: root.draftTokenUrl + "  →  + API Token, then paste it below."
-                        color: root.mutedForeground
-                        font.family: Style.font.family; font.pixelSize: Style.font.caption
-                    }
-                    Text {
-                        textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
-                        text: "2. API token" + (root.hasToken ? " (already saved — new one replaces it)" : "")
-                        color: root.mutedForeground
-                        font.family: Style.font.family; font.pixelSize: Style.font.bodySmall
-                    }
-                    TextField {
-                        id: tokenField
-                        width: parent.width
-                        password: true
-                        placeholderText: "Paste token here"
-                        onTextChanged: root.tokenDraft = text
-                        onAccepted: {
-                            if (root.tokenDraft !== "" && !tokenProcess.running)
-                                root.saveToken()
-                        }
-                    }
-                    Button {
-                        text: "Save token"; bordered: true
-                        enabled: root.tokenDraft !== "" && !tokenProcess.running
-                        horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
-                        onClicked: root.saveToken()
-                    }
-                    Text {
-                        visible: root.saveMessage !== ""
-                        textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
-                        text: root.saveMessage
-                        color: root.mutedForeground
-                        font.family: Style.font.family; font.pixelSize: Style.font.caption
-                    }
-
-                    Row {
-                        width: parent.width; spacing: Style.space(8)
+                        id: setupCol
+                        width: setupScroll.width; spacing: Style.space(8)
                         Text {
-                            textFormat: Text.PlainText; width: parent.width - aboutLink.width - Style.space(8)
-                            wrapMode: Text.Wrap; anchors.verticalCenter: parent.verticalCenter
-                            text: "Free, open-source project management."
+                            textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
+                            text: "SETUP"
+                            color: root.accentForeground
+                            font.family: Style.font.family; font.pixelSize: Style.font.caption; font.bold: true
+                        }
+                        Text {
+                            textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
+                            text: "1. OpenProject instance URL"
+                            color: root.mutedForeground
+                            font.family: Style.font.family; font.pixelSize: Style.font.bodySmall
+                        }
+                        TextField {
+                            id: urlField
+                            width: parent.width
+                            placeholderText: "https://projects.example.com"
+                            onTextChanged: root.urlDraft = text
+                            onAccepted: {
+                                if (root.urlDraft.trim() !== "" && !saveProcess.running)
+                                    root.saveSetting("openprojectUrl", root.urlDraft.trim())
+                            }
+                        }
+                        Row {
+                            spacing: Style.space(6)
+                            Button {
+                                text: "Save URL"; bordered: true
+                                enabled: root.urlDraft.trim() !== "" && !saveProcess.running
+                                horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
+                                onClicked: root.saveSetting("openprojectUrl", root.urlDraft.trim())
+                            }
+                            Button {
+                                text: "Generate API token ↗"; bordered: true
+                                enabled: root.draftTokenUrl !== ""
+                                tooltipText: root.draftTokenUrl
+                                horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
+                                onClicked: Qt.openUrlExternally(root.draftTokenUrl)
+                            }
+                        }
+                        Text {
+                            visible: root.draftTokenUrl !== ""
+                            textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
+                            text: root.draftTokenUrl + "  →  + API Token, then paste it below."
                             color: root.mutedForeground
                             font.family: Style.font.family; font.pixelSize: Style.font.caption
                         }
-                        Button {
-                            id: aboutLink
-                            text: "openproject.org ↗"; bordered: true
-                            horizontalPadding: Style.space(8); verticalPadding: Style.space(3)
-                            onClicked: Qt.openUrlExternally("https://www.openproject.org")
+                        Text {
+                            textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
+                            text: "2. API token" + (root.hasToken ? " (already saved — new one replaces it)" : "")
+                            color: root.mutedForeground
+                            font.family: Style.font.family; font.pixelSize: Style.font.bodySmall
                         }
-                    }
+                        TextField {
+                            id: tokenField
+                            width: parent.width
+                            password: true
+                            placeholderText: "Paste token here"
+                            onTextChanged: root.tokenDraft = text
+                            onAccepted: {
+                                if (root.tokenDraft !== "" && !tokenProcess.running)
+                                    root.saveToken()
+                            }
+                        }
+                        Button {
+                            text: "Save token"; bordered: true
+                            enabled: root.tokenDraft !== "" && !tokenProcess.running
+                            horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
+                            onClicked: root.saveToken()
+                        }
+                        Text {
+                            visible: root.saveMessage !== ""
+                            textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
+                            text: root.saveMessage
+                            color: root.mutedForeground
+                            font.family: Style.font.family; font.pixelSize: Style.font.caption
+                        }
+    
+                        Row {
+                            width: parent.width; spacing: Style.space(8)
+                            Text {
+                                textFormat: Text.PlainText; width: parent.width - aboutLink.width - Style.space(8)
+                                wrapMode: Text.Wrap; anchors.verticalCenter: parent.verticalCenter
+                                text: "Free, open-source project management."
+                                color: root.mutedForeground
+                                font.family: Style.font.family; font.pixelSize: Style.font.caption
+                            }
+                            Button {
+                                id: aboutLink
+                                text: "openproject.org ↗"; bordered: true
+                                horizontalPadding: Style.space(8); verticalPadding: Style.space(3)
+                                onClicked: Qt.openUrlExternally("https://www.openproject.org")
+                            }
+                        }
                     }
                 }
 
