@@ -314,7 +314,7 @@ Panel {
                         enabled: root.configured
                         tooltipText: "Open your OpenProject My page"
                         horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
-                        onClicked: root.openMyPage()
+                        onClicked: { root.openMyPage(); root.close() }
                     }
                     Button {
                         id: newTaskButton
