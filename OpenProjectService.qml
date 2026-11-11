@@ -25,6 +25,7 @@ Item {
 
     signal cacheChanged()
     signal actionDone(bool ok, string message)
+    signal statusDone(bool ok, string message)
 
     // Reflects whether the private token file exists and is non-empty. Deleted
     // or emptied files flip hasToken on the fly so the widget can prompt setup.
@@ -75,6 +76,16 @@ Item {
         actionProcess.running = true
     }
 
+    function updateComment(timeEntryId, comment) {
+        if (root.busy) return
+        root.lastError = ""
+        root.lastStatus = "Saving label..."
+        actionProcess.command = ["/usr/bin/python3", root.helperPath]
+            .concat(root.cleanArgs()).concat(["label", String(timeEntryId),
+                "--comment", String(comment === undefined || comment === null ? "" : comment)])
+        actionProcess.running = true
+    }
+
     function updateTask(workPackageId, statusId, priorityId) {
         if (root.busy) return
         root.lastError = ""
@@ -103,7 +114,8 @@ Item {
         stderr: StdioCollector { id: statusErr; waitForEnd: true }
         onExited: function(code) {
             var parsed = root.parseJson(statusOut.text)
-            if (code === 0 && parsed && parsed.ok === true) {
+            var ok = code === 0 && parsed && parsed.ok === true
+            if (ok) {
                 root.lastStatus = ""
                 root.cacheChanged()
             } else {
@@ -113,6 +125,7 @@ Item {
                 root.lastStatus = ""
             }
             root.cacheChanged()
+            root.statusDone(ok, ok ? "" : root.lastError)
         }
     }
 
@@ -126,7 +139,8 @@ Item {
             var ok = code === 0 && parsed && parsed.ok === true
             var msg
             if (ok) {
-                if (parsed.updated === true) msg = "Task updated."
+                if (parsed.labeled === true) msg = "Label saved."
+                else if (parsed.updated === true) msg = "Task updated."
                 else if (parsed.alreadyRunning === true) msg = "Timer already running."
                 else if (parsed.stopped !== undefined) msg = parsed.stopped > 0 ? "Timer stopped." : "No timer running."
                 else if (parsed.stoppedOthers > 0) msg = "Timer started (previous stopped)."

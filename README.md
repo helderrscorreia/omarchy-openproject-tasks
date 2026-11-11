@@ -7,8 +7,9 @@ Bar widget that shows your **open assigned OpenProject work packages**, their **
 - Orange `⏱ <count>` bar icon; a `●` accent dot appears while a timer is running.
 - Click the icon to open the panel.
 - Tasks sorted by priority (custom "Very High" supported) with status colors.
-- Start / Switch / Stop the timer per task, with a **comment label** kept on the time entry.
-- Search box to filter tasks (subject, id, project, status, type, priority).
+- One-click Start / Switch / Stop per task; add or edit the **comment label** on the running-timer card at any time.
+- Click a task title to open that work package in your browser.
+- Search box to filter tasks (subject, id, project, status, type, priority), focused automatically when the panel opens; `Enter` starts or stops the top result.
 - `+ New task` opens OpenProject's create-work-package page in your browser.
 - `My page` opens your OpenProject My page (`<url>/my/page`) in your browser.
 - Only sends authenticated HTTPS requests to the OpenProject instance you configure.
@@ -31,8 +32,10 @@ The instance URL is stored in your user's Omarchy shell settings. The API token 
 ## Usage
 
 - **Open / close**: left-click the bar icon.
-- **Start**: select a task and press Start (other running timers are auto-stopped). Add a comment; the comment is stored on the time entry.
-- **Stop**: press Stop on the active task, or it stops all ongoing timers.
+- **Start**: press Start on a task (other running timers are auto-stopped). Optionally type a label in the running-timer card and press Enter/Save label.
+- **Stop**: press Stop on the active task or on the running-timer card.
+- **Open a task**: click its title (the panel closes while your browser opens it).
+- **Search**: type to filter; `Enter` starts or stops the top result, `Esc` closes the panel.
 - **New task**: header `+ New task` opens the create-work-package page in the browser.
 - **My page**: header `My page` opens your OpenProject My page (`<url>/my/page`) in the browser.
 
@@ -48,6 +51,7 @@ omarchy plugin remove helderrscorreia.openproject-tasks
 - `--status`: fetches open work packages assigned to you + ongoing time entries → cache.
 - `--start <wpId> --comment "..."`: auto-stops other timers, creates a new ongoing time entry with a comment.
 - `--stop [id]`: stops the given entry or all ongoing timers.
+- `--label <entryId> --comment "..."`: sets or clears the comment on a time entry.
 - `BarWidget.qml` renders the bar icon and loads the panel.
 - `Panel.qml` lists tasks, search, timer controls, and the create-task button.
 - `OpenProjectModel.js` computes priority ordering and status/priority colors.

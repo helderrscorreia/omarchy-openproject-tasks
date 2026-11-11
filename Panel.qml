@@ -25,6 +25,12 @@ Panel {
     property string actionMessage: ""
     property string searchQuery: ""
     property string editingTaskId: ""
+    // Label draft for the running timer; tied to the time entry id so polling
+    // does not overwrite what the user is typing.
+    property string labelDraft: ""
+    property string labelEntryId: ""
+    property bool pendingVerify: false
+    property int verifyAttempts: 0
 
     // Reference lists from the cache -> { value, label } for the pickers.
     property var statusOptions: []
@@ -59,7 +65,6 @@ Panel {
     property string urlDraft: ""
     property string tokenDraft: ""
     property string saveMessage: ""
-    property bool justSaved: false
     // The click that opens the panel has a release event that, during the
     // Exclusive focus prime, lands on the dismissal surface and would close it
     // instantly. Suppress any close that arrives within a short window of open.
@@ -67,9 +72,60 @@ Panel {
     readonly property string draftTokenUrl: Model.tokenUrlFor(
         root.urlDraft.trim() !== "" ? root.urlDraft : String(setting("openprojectUrl", "") || ""))
 
-    // Comment draft per task id for the inline label field
-    property string commentDraftTaskId: ""
-    property string commentDraft: ""
+    // Keep the label field in sync with the running entry without clobbering
+    // edits while the user types (polling replaces the ongoing array).
+    function syncLabelDraft() {
+        var entry = root.ongoing.length > 0 ? root.ongoing[0] : null
+        var id = entry ? String(entry.id || "") : ""
+        if (id === root.labelEntryId) return
+        root.labelEntryId = id
+        root.labelDraft = entry ? String(entry.comment || "") : ""
+    }
+    function saveLabel() {
+        var entry = root.ongoing.length > 0 ? root.ongoing[0] : null
+        if (!entry || !service || root.busy) return
+        root.actionMessage = ""
+        service.updateComment(entry.id, root.labelDraft)
+    }
+    function startTask(task) {
+        if (!task || !service || root.busy) return
+        root.actionMessage = ""
+        service.startTimer(task.id)
+    }
+    function focusSearch() {
+        Qt.callLater(function() {
+            if (root.configured && !root.settingsOpen && searchField)
+                searchField.forceActiveFocus()
+        })
+    }
+    // After saving the URL/token, check the connection instead of closing
+    // Setup blindly; close only once a refresh succeeded.
+    function verifyConnection() {
+        if (!service) return
+        // The URL/token watchers can lag the helper process by a tick; retry
+        // briefly before declaring setup incomplete.
+        if (!root.configured && root.verifyAttempts < 10) {
+            root.verifyAttempts++
+            verifyDelay.restart()
+            return
+        }
+        if (!root.configured) {
+            root.verifyAttempts = 0
+            root.saveMessage = "Saved. Add an API token to connect."
+            return
+        }
+        if (service.busy) {
+            // Let an in-flight poll finish; its result cannot verify the new
+            // settings, so try again once the service is idle.
+            verifyDelay.restart()
+            return
+        }
+        root.verifyAttempts = 0
+        root.pendingVerify = true
+        root.saveMessage = "Checking connection…"
+        verifyTimer.restart()
+        service.refresh()
+    }
 
     function resetDrafts() {
         var savedUrl = String(setting("openprojectUrl", "") || "")
@@ -82,7 +138,6 @@ Panel {
     function saveSetting(key, value) {
         if (saveProcess.running) return
         root.saveMessage = "Saving..."
-        root.justSaved = true
         saveProcess.command = ["/usr/bin/omarchy", "bar", "set",
             root.moduleName, key, String(value)]
         saveProcess.running = true
@@ -95,7 +150,6 @@ Panel {
         var token = root.tokenDraft
         if (!token) return
         root.saveMessage = "Saving..."
-        root.justSaved = true
         tokenProcess.secret = token
         // Purge the secret from editable state as soon as it is captured so a
         // defensively-minded scan sees it leave the QML context.
@@ -109,12 +163,7 @@ Panel {
     readonly property string tokenFilePath: service ? service.tokenFilePath : ""
 
     onSettingsOpenChanged: if (settingsOpen) resetDrafts()
-    onConfiguredChanged: {
-        if (configured && justSaved) {
-            justSaved = false
-            settingsOpen = false
-        }
-    }
+    onOngoingChanged: root.syncLabelDraft()
     Component.onCompleted: resetDrafts()
 
     function open() {
@@ -122,7 +171,9 @@ Panel {
         if (!root.configured) root.settingsOpen = true
         if (service) service.refresh()
         cacheFile.reload()
+        root.syncLabelDraft()
         root.controller.show()
+        root.focusSearch()
     }
     function close() {
         // The opening click's mouse-up is often re-routed to the dismissal
@@ -132,7 +183,6 @@ Panel {
         if (Date.now() - root.openedAt < 300) return
         root.settingsOpen = false
         root.editingTaskId = ""
-        root.commentDraftTaskId = ""
         root.controller.hide()
     }
     function toggle() {
@@ -215,6 +265,43 @@ Panel {
     }
 
     Timer { id: tick; interval: 1000; repeat: true; running: root.opened && root.ongoing.length > 0; onTriggered: elapsedText.refresh() }
+    Timer {
+        id: verifyTimer
+        interval: 12000
+        repeat: false
+        onTriggered: {
+            if (!root.pendingVerify) return
+            root.pendingVerify = false
+            root.saveMessage = "No response from OpenProject. Check the URL and try again."
+        }
+    }
+    Timer {
+        id: verifyDelay
+        interval: 200
+        repeat: false
+        onTriggered: root.verifyConnection()
+    }
+    Timer {
+        id: closeTimer
+        interval: 900
+        repeat: false
+        onTriggered: root.settingsOpen = false
+    }
+
+    Connections {
+        target: root.service
+        function onStatusDone(ok, message) {
+            if (!root.pendingVerify) return
+            root.pendingVerify = false
+            verifyTimer.stop()
+            if (ok) {
+                root.saveMessage = "Connected ✓"
+                closeTimer.restart()
+            } else {
+                root.saveMessage = "Connection failed: " + (message !== "" ? message : "unknown error")
+            }
+        }
+    }
     QtObject {
         id: elapsedText
         property int n: 0
@@ -230,10 +317,8 @@ Panel {
         stderr: StdioCollector { id: saveErr; waitForEnd: true }
         onExited: function(code) {
             if (code === 0) {
-                root.saveMessage = "Saved."
-                if (service) Qt.callLater(service.refresh)
+                Qt.callLater(root.verifyConnection)
             } else {
-                root.justSaved = false
                 var msg = String(saveErr.text || saveOut.text || "Save failed.").replace(/\s+/g, " ").trim()
                 root.saveMessage = msg.length > 220 ? msg.substring(0, 217) + "..." : msg
             }
@@ -254,10 +339,8 @@ Panel {
         }
         onExited: function(code) {
             if (code === 0) {
-                root.saveMessage = "Token saved."
-                if (service) Qt.callLater(service.refresh)
+                Qt.callLater(root.verifyConnection)
             } else {
-                root.justSaved = false
                 var msg = String(tokenErr.text || tokenOut.text || "Token save failed.").replace(/\s+/g, " ").trim()
                 root.saveMessage = msg.length > 220 ? msg.substring(0, 217) + "..." : msg
             }
@@ -346,10 +429,16 @@ Panel {
                     }
                 }
 
-                // Setup view
-                Column {
+                // Setup view (scrollable so long URLs/messages cannot clip it)
+                Flickable {
+                    id: setupScroll
                     visible: root.settingsOpen
-                    width: parent.width; spacing: Style.space(8)
+                    width: parent.width; height: Math.max(0, parent.height - y)
+                    contentWidth: width; contentHeight: setupCol.implicitHeight
+                    clip: true; boundsBehavior: Flickable.StopAtBounds
+                    Column {
+                    id: setupCol
+                    width: setupScroll.width; spacing: Style.space(8)
                     Text {
                         textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
                         text: "SETUP"
@@ -426,29 +515,22 @@ Panel {
                         font.family: Style.font.family; font.pixelSize: Style.font.caption
                     }
 
-                    Item { width: parent.width; height: Style.space(2) }
-                    Text {
-                        textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
-                        text: "ABOUT OPENPROJECT"
-                        color: root.accentForeground
-                        font.family: Style.font.family; font.pixelSize: Style.font.caption; font.bold: true
+                    Row {
+                        width: parent.width; spacing: Style.space(8)
+                        Text {
+                            textFormat: Text.PlainText; width: parent.width - aboutLink.width - Style.space(8)
+                            wrapMode: Text.Wrap; anchors.verticalCenter: parent.verticalCenter
+                            text: "Free, open-source project management."
+                            color: root.mutedForeground
+                            font.family: Style.font.family; font.pixelSize: Style.font.caption
+                        }
+                        Button {
+                            id: aboutLink
+                            text: "openproject.org ↗"; bordered: true
+                            horizontalPadding: Style.space(8); verticalPadding: Style.space(3)
+                            onClicked: Qt.openUrlExternally("https://www.openproject.org")
+                        }
                     }
-                    Text {
-                        textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
-                        text: "OpenProject is a free, open-source web-based project management & collaboration suite (MIT-licensed, GPLv3 for the core plus an open core). It brings together task and work-package tracking, Gantt charts, agile boards, time & cost tracking, and a full planning API — self-hostable or in the cloud at openproject.org."
-                        color: root.mutedForeground
-                        font.family: Style.font.family; font.pixelSize: Style.font.bodySmall
-                    }
-                    Text {
-                        textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
-                        text: "This widget pulls your assigned open work packages and the active time-tracking session straight from your OpenProject instance into the Quickshell/Omanchy bar, with start/stop timers and comment labels."
-                        color: root.mutedForeground
-                        font.family: Style.font.family; font.pixelSize: Style.font.bodySmall
-                    }
-                    Button {
-                        text: "openproject.org ↗"; bordered: true
-                        horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
-                        onClicked: Qt.openUrlExternally("https://www.openproject.org")
                     }
                 }
 
@@ -479,13 +561,22 @@ Panel {
                             color: root.contentForeground
                             font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true
                         }
-                        Text {
-                            visible: root.ongoing.length > 0 && root.ongoing[0].comment !== ""
-                            textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
-                            text: root.ongoing.length > 0 ? root.ongoing[0].comment : ""
-                            color: root.mutedForeground
-                            font.family: Style.font.family; font.pixelSize: Style.font.caption
-                            font.italic: true
+                        Row {
+                            width: parent.width; spacing: Style.space(4)
+                            TextField {
+                                id: labelField
+                                width: parent.width - saveLabelBtn.width - Style.space(4)
+                                placeholderText: "Add a label / comment…"
+                                text: root.labelDraft
+                                onTextChanged: root.labelDraft = text
+                                onAccepted: root.saveLabel()
+                            }
+                            Button {
+                                id: saveLabelBtn
+                                text: "Save label"; bordered: true; enabled: !root.busy
+                                horizontalPadding: Style.space(7); verticalPadding: Style.space(3)
+                                onClicked: root.saveLabel()
+                            }
                         }
                         Row {
                             spacing: Style.space(6)
@@ -519,14 +610,33 @@ Panel {
                         placeholderText: "Search tasks…"
                         text: root.searchQuery
                         onTextChanged: root.searchQuery = text
+                        onAccepted: {
+                            if (root.visibleTasks.length === 0) return
+                            var task = root.visibleTasks[0]
+                            var timing = root.ongoing.length > 0
+                                && String(root.ongoing[0].workPackageId) === String(task.id)
+                            if (timing) {
+                                root.actionMessage = ""
+                                service.stopTimer(root.ongoing[0].id)
+                            } else {
+                                root.startTask(task)
+                            }
+                        }
                     }
                     Button {
                         id: clearBtn
                         text: "✕"; bordered: true
                         enabled: root.searchQuery !== ""
                         horizontalPadding: Style.space(8); verticalPadding: Style.space(5)
-                        onClicked: { root.searchQuery = ""; searchField.text = "" }
+                        onClicked: { root.searchQuery = ""; searchField.text = ""; searchField.forceActiveFocus() }
                     }
+                }
+                Text {
+                    visible: !root.settingsOpen && root.configured
+                    textFormat: Text.PlainText; width: parent.width; wrapMode: Text.Wrap
+                    text: "Esc closes · Enter starts or stops the top result"
+                    color: root.mutedForeground
+                    font.family: Style.font.family; font.pixelSize: Style.font.caption
                 }
 
                 // Edit task view (status/priority pickers)
@@ -604,7 +714,6 @@ Panel {
                                 required property var modelData
                                 readonly property bool isTiming: root.ongoing.length > 0
                                     && String(root.ongoing[0].workPackageId) === String(modelData.id)
-                                readonly property bool showCommentField: root.commentDraftTaskId === String(modelData.id)
                                 width: taskCol.width
                                 height: taskInner.implicitHeight + Style.space(10)
                                 radius: Style.cornerRadius
@@ -629,11 +738,19 @@ Panel {
                                             }
                                         }
                                         Text {
+                                            id: titleText
                                             textFormat: Text.PlainText
                                             width: parent.width - x; elide: Text.ElideRight
                                             text: "#" + modelData.id + "  " + modelData.subject
-                                            color: root.contentForeground
+                                            color: titleMouse.containsMouse || isTiming ? root.accentForeground : root.contentForeground
                                             font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: isTiming
+                                            MouseArea {
+                                                id: titleMouse
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: { root.openTaskInBrowser(modelData); root.close() }
+                                            }
                                         }
                                     }
                                     Row {
@@ -652,53 +769,19 @@ Panel {
                                             elide: Text.ElideRight; width: parent.width - x
                                         }
                                     }
-                                    // Comment field (shown when starting a timer)
-                                    Row {
-                                        visible: showCommentField
-                                        width: parent.width; spacing: Style.space(4)
-                                        TextField {
-                                            id: commentField
-                                            width: parent.width - commentStartBtn.width - Style.space(4)
-                                            placeholderText: "Label / comment for this timer..."
-                                            text: root.commentDraft
-                                            onTextChanged: root.commentDraft = text
-                                            onAccepted: {
-                                                root.actionMessage = ""
-                                                service.startTimer(modelData.id, root.commentDraft)
-                                                root.commentDraftTaskId = ""
-                                                root.commentDraft = ""
-                                            }
-                                        }
-                                        Button {
-                                            id: commentStartBtn
-                                            text: "Go"; bordered: true; enabled: !root.busy
-                                            horizontalPadding: Style.space(7); verticalPadding: Style.space(3)
-                                            onClicked: {
-                                                root.actionMessage = ""
-                                                service.startTimer(modelData.id, root.commentDraft)
-                                                root.commentDraftTaskId = ""
-                                                root.commentDraft = ""
-                                            }
-                                        }
-                                    }
                                     Row {
                                         spacing: Style.space(6)
                                         Button {
                                             text: isTiming ? "Timing ●" : (root.ongoing.length > 0 ? "Switch" : "Start")
                                             bordered: true; enabled: !root.busy
+                                            tooltipText: isTiming ? "Stop this timer" : "Start tracking this task"
                                             horizontalPadding: Style.space(7); verticalPadding: Style.space(3)
                                             onClicked: {
-                                                root.actionMessage = ""
                                                 if (isTiming) {
+                                                    root.actionMessage = ""
                                                     service.stopTimer(root.ongoing[0].id)
-                                                } else if (root.ongoing.length > 0) {
-                                                    // Switching: show comment field for label
-                                                    root.commentDraftTaskId = String(modelData.id)
-                                                    root.commentDraft = ""
                                                 } else {
-                                                    // First timer: show comment field for label
-                                                    root.commentDraftTaskId = String(modelData.id)
-                                                    root.commentDraft = ""
+                                                    root.startTask(modelData)
                                                 }
                                             }
                                         }
@@ -711,11 +794,6 @@ Panel {
                                                 root.actionMessage = ""
                                                 root.editingTaskId = root.editingTaskId === String(modelData.id) ? "" : String(modelData.id)
                                             }
-                                        }
-                                        Button {
-                                            text: "Open"; bordered: true
-                                            horizontalPadding: Style.space(7); verticalPadding: Style.space(3)
-                                            onClicked: { root.openTaskInBrowser(modelData); root.close() }
                                         }
                                     }
                                 }
@@ -730,6 +808,15 @@ Panel {
                             horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap
                             topPadding: Style.space(18)
                         }
+                        Row {
+                            visible: !root.configured && root.effectiveError === ""
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            Button {
+                                text: "Open setup"; bordered: true
+                                horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
+                                onClicked: root.settingsOpen = true
+                            }
+                        }
                         Text {
                             visible: root.configured && root.tasks.length === 0 && root.effectiveError === ""
                             textFormat: Text.PlainText; width: parent.width
@@ -738,6 +825,15 @@ Panel {
                             font.family: Style.font.family; font.pixelSize: Style.font.body
                             horizontalAlignment: Text.AlignHCenter; topPadding: Style.space(18)
                         }
+                        Row {
+                            visible: root.configured && root.tasks.length === 0 && root.effectiveError === ""
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            Button {
+                                text: "+ New task"; bordered: true
+                                horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
+                                onClicked: root.newTask()
+                            }
+                        }
                         Text {
                             visible: root.configured && root.tasks.length > 0 && root.visibleTasks.length === 0
                             textFormat: Text.PlainText; width: parent.width
@@ -745,6 +841,15 @@ Panel {
                             color: root.mutedForeground
                             font.family: Style.font.family; font.pixelSize: Style.font.body
                             horizontalAlignment: Text.AlignHCenter; topPadding: Style.space(18)
+                        }
+                        Row {
+                            visible: root.configured && root.tasks.length > 0 && root.visibleTasks.length === 0
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            Button {
+                                text: "Clear search"; bordered: true
+                                horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
+                                onClicked: { root.searchQuery = ""; searchField.text = ""; searchField.forceActiveFocus() }
+                            }
                         }
                     }
                 }

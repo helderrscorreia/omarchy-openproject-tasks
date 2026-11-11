@@ -8,6 +8,8 @@ Commands:
   status                          Fetch open tasks + ongoing timers -> cache.json
   start <workPackageId> [--comment TEXT]   Stop other timers, start new one
   stop [timeEntryId]              Stop given entry or all ongoing timers
+  label <timeEntryId> [--comment TEXT]
+                                  Set or clear the comment label on a time entry
   update <workPackageId> [--status ID] [--priority ID]
                                   Change a task's status and/or priority
   save-token                      Read an API token from stdin and store it in
@@ -425,6 +427,20 @@ def cmd_stop(args):
     print(json.dumps({"ok": True, "stopped": len(targets)}))
 
 
+def cmd_label(args):
+    base = normalize_base(args.url)
+    token = resolve_token(args)
+    if not base or not token:
+        fail("Set openprojectUrl (https) and an API token first.")
+    tid = str(args.time_entry_id or "").strip()
+    if not tid.isdigit():
+        fail("Invalid time entry id.")
+    body = {"comment": {"raw": (args.comment or "").strip()}}
+    api_request(base, token, "PATCH", "/api/v3/time_entries/{}".format(tid),
+                body=body, timeout=args.timeout)
+    print(json.dumps({"ok": True, "labeled": True}))
+
+
 def cmd_update(args):
     base = normalize_base(args.url)
     token = resolve_token(args)
@@ -486,6 +502,9 @@ def main():
     s.add_argument("--comment", default="", help="Comment label for the time entry")
     t = sub.add_parser("stop")
     t.add_argument("time_entry_id", nargs="?")
+    lb = sub.add_parser("label")
+    lb.add_argument("time_entry_id")
+    lb.add_argument("--comment", default="", help="New label (empty clears it)")
     u = sub.add_parser("update")
     u.add_argument("work_package_id")
     u.add_argument("--status-id", default="", dest="status_id")
@@ -496,6 +515,8 @@ def main():
             cmd_start(args)
         elif args.cmd == "stop":
             cmd_stop(args)
+        elif args.cmd == "label":
+            cmd_label(args)
         elif args.cmd == "update":
             cmd_update(args)
         elif args.cmd == "save-token":
