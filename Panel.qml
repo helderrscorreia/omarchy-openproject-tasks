@@ -307,14 +307,6 @@ Panel {
                         }
                     }
                     Button {
-                        anchors.right: myPageButton.left; anchors.rightMargin: Style.space(6)
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "Refresh"; bordered: true
-                        enabled: root.configured && !root.busy
-                        horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
-                        onClicked: { root.actionMessage = ""; service.refresh(); cacheFile.reload() }
-                    }
-                    Button {
                         id: myPageButton
                         anchors.right: newTaskButton.left; anchors.rightMargin: Style.space(6)
                         anchors.verticalCenter: parent.verticalCenter
@@ -326,13 +318,23 @@ Panel {
                     }
                     Button {
                         id: newTaskButton
-                        anchors.right: settingsButton.left; anchors.rightMargin: Style.space(6)
+                        anchors.right: refreshButton.left; anchors.rightMargin: Style.space(6)
                         anchors.verticalCenter: parent.verticalCenter
                         text: "+ New task"; bordered: true
                         enabled: root.configured
                         tooltipText: "Create a new work package in OpenProject"
                         horizontalPadding: Style.space(8); verticalPadding: Style.space(4)
                         onClicked: root.newTask()
+                    }
+                    Button {
+                        id: refreshButton
+                        anchors.right: settingsButton.left; anchors.rightMargin: Style.space(6)
+                        anchors.verticalCenter: parent.verticalCenter
+                        iconText: "󰑐"; tooltipText: "Refresh tasks"
+                        bordered: true
+                        enabled: root.configured && !root.busy
+                        horizontalPadding: Style.space(7); verticalPadding: Style.space(4)
+                        onClicked: { root.actionMessage = ""; service.refresh(); cacheFile.reload() }
                     }
                     Button {
                         id: settingsButton
